@@ -30,6 +30,15 @@ jobs:
           "$sdkmanager" "platforms;android-36" "build-tools;36.0.0"
       - name: Build debug APK
         run: gradle :android:app:assembleDebug
+      - name: Verify APK
+        run: |
+          apk_path="$(find android/app/build/outputs/apk/debug -name '*.apk' -print -quit)"
+          apkanalyzer="$(find "$ANDROID_HOME/cmdline-tools" -type f -name apkanalyzer | sort | tail -n 1)"
+          test -n "$apk_path"
+          test -x "$apkanalyzer"
+          test "$("$apkanalyzer" manifest application-id "$apk_path")" = "com.atlas.assistant"
+          unzip -t "$apk_path" >/dev/null
+          unzip -l "$apk_path" | grep -q 'assets/public/config.js'
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:

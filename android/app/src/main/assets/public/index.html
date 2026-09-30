@@ -1,7 +1,7 @@
 <!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ATLAS</title>
-<link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#ffffff"><link rel="icon" href="/icons/icon-192.png"><link rel="apple-touch-icon" href="/icons/icon-192.png"><script src="/config.js"></script>
+<link rel="manifest" href="./manifest.webmanifest"><meta name="theme-color" content="#ffffff"><link rel="icon" href="./icons/icon-192.png"><link rel="apple-touch-icon" href="./icons/icon-192.png"><script src="./config.js" onerror="window.ATLAS_CONFIG_LOAD_ERROR=true"></script>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#fff;--bg2:#F7F7F7;--fg:#111;--muted:#8C8C8C;--line:#EEE;--primary:#0A4DFF;--soft:#E8F1FF;--card:#fff;--sh:0 2px 12px rgba(0,0,0,.08);box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -255,7 +255,7 @@ ${authMsg()}<button class="lb k" ${S.authBusy?'disabled':''} onclick="createAcco
 <input id="auth-email" class="auth-input" type="email" autocomplete="email" placeholder="E-mail" aria-label="E-mail" value="${esc(S.authEmail||'')}">
 ${authMsg()}<button class="lb k" ${S.authBusy?'disabled':''} onclick="resetPassword()">${S.authBusy?'Enviando...':'Enviar e-mail de recuperação'}</button></div>`}
 </div>
-<div class="l2f"><p>Ao continuar, você concorda com os <b>Termos de serviço</b> e com a <b>Política de privacidade</b> da ATLAS.</p>${window.FB?'':'<p class="n2">Firebase não está configurado neste ambiente.</p>'}</div>${S.authInitializing?'<div class="ld" role="status" aria-label="Verificando sessão"><div><i></i></div></div>':''}</div>`;
+<div class="l2f"><p>Ao continuar, você concorda com os <b>Termos de serviço</b> e com a <b>Política de privacidade</b> da ATLAS.</p>${S.authReady&&!window.FB?'<p class="n2">'+esc(S.authError||'Firebase indisponível: verifique a configuração em config.js.')+'</p>':''}</div>${S.authInitializing?'<div class="ld" role="status" aria-label="Verificando sessão"><div><i></i></div></div>':''}</div>`;
 function authView(view){S.authScreen=view;S.authError='';S.authOk='';S.authBusy=false;draw();}
 const enter=v=>{S.in=1;S.ld=1;draw();setTimeout(()=>{S.ld=0;S.in=1;go('home')},900)};
 function typing(){clearTimeout(S.ty);const t=$('#ty'),d=$('#dt');if(!t)return;S.pi=S.pi||0;
@@ -500,7 +500,7 @@ S.authBusy=true;draw();try{await FB.reset(email);S.authBusy=false;S.authOk='Se h
 function delAcc(){sheet('Excluir conta e dados',`<p>Isso apaga sua conta de login e todas as conversas, tarefas, arquivos e memórias deste aparelho. Não dá para desfazer.</p><button class="btn s" style="color:#FF3B30" onclick="delAcc2()">Excluir tudo</button>`)}
 async function delAcc2(){try{window.FB&&FB.user()&&await FB.del()}catch(e){toast('Entre de novo e tente excluir logo em seguida');return}localStorage.removeItem('atlas.v2');location.reload()}
 addEventListener('fbready',()=>S.v=='login'&&draw());
-if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
+if(/^https?:$/.test(location.protocol)&&'serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
 addEventListener('click',()=>{const m=$('#mn');m&&(m.hidden=1)});
 addEventListener('online',()=>S.v!='login'&&draw());addEventListener('offline',()=>S.v!='login'&&draw());
 addEventListener('keydown',e=>{if(e.key=='Escape'){side(0)}});
@@ -514,6 +514,8 @@ draw();
 </script>
 <script type="module">
 const C=(window.ATLAS_CONFIG||{}).firebase;
+const runtime=()=>{if(window.Capacitor?.isNativePlatform?.())return'capacitor';if(window.cordova?.platformId)return'cordova';if(window.ATLASNative&&/Android/i.test(navigator.userAgent))return'android-webview';return'web'};
+const useRedirectAuth=()=>runtime()!=='web';
 if(C&&C.apiKey){
 try{
 const B='https://www.gstatic.com/firebasejs/11.0.2/';
@@ -523,7 +525,7 @@ const app=initializeApp(C),auth=A.getAuth(app);auth.languageCode='pt-BR';
 await A.setPersistence(auth,A.browserLocalPersistence);
 const googleProvider=new A.GoogleAuthProvider();googleProvider.setCustomParameters({prompt:'select_account'});
 window.FB={
-google:async()=>{if(window.Capacitor?.isNativePlatform?.())return A.signInWithRedirect(auth,googleProvider);return A.signInWithPopup(auth,googleProvider)},googleCalendar:async()=>{const p=new A.GoogleAuthProvider();p.addScope('https://www.googleapis.com/auth/calendar');p.setCustomParameters({prompt:'consent'});if(window.Capacitor?.isNativePlatform?.()){return A.signInWithRedirect(auth,p)}const r=await A.signInWithPopup(auth,p);const c=A.GoogleAuthProvider.credentialFromResult(r);if(c?.accessToken){S.gcalToken=c.accessToken;save()}return r},
+google:async()=>{if(useRedirectAuth())return A.signInWithRedirect(auth,googleProvider);return A.signInWithPopup(auth,googleProvider)},googleCalendar:async()=>{const p=new A.GoogleAuthProvider();p.addScope('https://www.googleapis.com/auth/calendar');p.setCustomParameters({prompt:'consent'});if(useRedirectAuth()){return A.signInWithRedirect(auth,p)}const r=await A.signInWithPopup(auth,p);const c=A.GoogleAuthProvider.credentialFromResult(r);if(c?.accessToken){S.gcalToken=c.accessToken;save()}return r},
 email:(email,password)=>A.signInWithEmailAndPassword(auth,email,password),
 signup:(email,password)=>A.createUserWithEmailAndPassword(auth,email,password),
 profile:(name)=>auth.currentUser?A.updateProfile(auth.currentUser,{displayName:name}):Promise.resolve(),
@@ -532,8 +534,8 @@ user:()=>auth.currentUser,async token(){await auth.authStateReady();return auth.
 A.onAuthStateChanged(auth,u=>{S.authReady=true;S.authInitializing=false;if(u)finishAuth(u);else{S.in=0;S.authBusy=false;S.v='login';save();draw()}});
 try{const rr=await A.getRedirectResult(auth);if(rr?.user){const c=A.GoogleAuthProvider.credentialFromResult(rr);if(c?.accessToken){S.gcalToken=c.accessToken;save()}finishAuth(rr.user)}}catch(e){S.authReady=true;S.authInitializing=false;S.authBusy=false;S.authError=authErrorMessage(e,'login');draw()}
 window.dispatchEvent(new Event('fbready'));
-}catch(e){S.authReady=true;S.authInitializing=false;S.authError='Não foi possível inicializar o Firebase Authentication.';window.dispatchEvent(new Event('fbready'));draw()}
-}else{S.authInitializing=false;S.authReady=true;draw()}
+}catch(e){S.authReady=true;S.authInitializing=false;S.authError='Falha ao inicializar Firebase Authentication: '+(e?.code?e.code+': ':'')+(e?.message||String(e));window.dispatchEvent(new Event('fbready'));draw()}
+}else{S.authInitializing=false;S.authReady=true;S.authError=window.ATLAS_CONFIG_LOAD_ERROR?'Não foi possível carregar config.js.':'A configuração Firebase em config.js está ausente ou incompleta.';draw()}
 </script>
 
 <script>
